@@ -1,2 +1,14 @@
 How to get the manual refresh token:
 
+1.  Run the GetAccessToken.get_access_code() method.  It will pop up a web browser where you can enter
+    your credentials.
+
+2.  Select the character you want and accept the permissions asked for.
+
+3.  When done, you will be re-directed to a uri.  Since there is no listener on this url it will fail
+    TODO:  add a listener/parser and store the result
+    Copy the access code from the uri parameter to the access_code variable at the top of GetAccessToken.py
+
+4.  Run get_auth_token_from_access_code(), copy the auth_token and refresh_token from the output
+    TODO:  store the auth_token and refresh_token and automatically refresh instead of doing the manual copy
+

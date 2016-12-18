@@ -1,7 +1,3 @@
-from base64 import b64encode
-from urllib.parse import urlencode
-
-import requests
 from pyswagger import App, Security
 from pyswagger.contrib.client.requests import Client
 import pickle

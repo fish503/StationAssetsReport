@@ -3,8 +3,14 @@ from base64 import b64encode
 from urllib.parse import urlencode
 import requests
 
+# get this by running get_access_code()
 access_code = 'nH4R4KQS3dFlDgmejtAPU8-DbGUqyA1ep1JNVWPPzpXJav7Vjc5DESP061c8sZd_0'
-access_token = "OQhXc0gMHfaUzHPBq6EO82fzOSmUyb1XnkZx_A_1ec3-8Du809qU7LDiLGadefVdyoyAMa81Mj-axjlENaN-vg2"
+
+# get these by running get_auth_token_from_access_code
+# can also get a new auth_token by running geth_auth_token_from_refresh_token
+# TODO: store these tokens in a persistent store with expiration date, automatically request a new auth_token with the
+# TODO:   refresh_token when it expires.
+auth_token = "OQhXc0gMHfaUzHPBq6EO82fzOSmUyb1XnkZx_A_1ec3-8Du809qU7LDiLGadefVdyoyAMa81Mj-axjlENaN-vg2"
 refresh_token = "SL7MSKYDDdXxPiTlvNRb4VP68USjAjiaVtP-dbU7oYd9TdLCmgK0jhShJ1gr_lSTFY0StUOrkZTK-7vs_wSxiw2"
 
 client_id = 'ddc83a28e75b48598deb1819f2827199'  # atfish
@@ -31,7 +37,6 @@ def get_access_code():
             "esi-location.read_ship_type.v1",
             "esi-ui.write_waypoint.v1"])
             } )
-
     code_request_url = "https://login.eveonline.com/oauth/authorize/?" + query_string
     print (code_request_url)
     webbrowser.open(code_request_url)
