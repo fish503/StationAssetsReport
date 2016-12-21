@@ -1,11 +1,10 @@
-from pyswagger import App, Security
-from pyswagger.contrib.client.requests import Client
 import pickle
-from pathlib import Path
 
+from pyswagger import App
+from pyswagger.contrib.client.requests import Client
 from pyswagger.core import SwaggerSecurity
 
-dataDir = Path("D:\Python\Projects\StationAssetsReport\Data")
+from Config import *
 
 characters = {'Tansy Dabs' : 123,  'Brand Wessa' : 1951242298}
 
