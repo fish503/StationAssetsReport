@@ -1,13 +1,14 @@
-import pickle
 
-from pyswagger import App
+from pyswagger import App, utils
 from pyswagger.contrib.client.requests import Client
-from pyswagger.core import SwaggerSecurity
+from pyswagger.core import SwaggerSecurity, Security
 
 from Config import *
+from TokenManager import *
 
 characters = {'Tansy Dabs' : 123,  'Brand Wessa' : 1951242298}
 
+token_manager = TokenManager()
 
 def getEsiApi(refresh=False):
     filename = dataDir / "EsiApi.pickle"
@@ -20,21 +21,25 @@ def getEsiApi(refresh=False):
     return api
 
 def getAuthClient(esiApi, refresh=False):
-    # must be initialized with SwaggerApp
-    auth = SwaggerSecurity(esiApi)
-    auth.update_with('simple_oauth2', getAccessToken())
-    # pass into a client
+    auth = Security(esiApi)
+    print(token_manager.get_access_token('Brand Wessa'))
+    auth.update_with('evesso', token_manager.get_access_token('Brand Wessa')) #'Bearer %s' % TokenManager().get_access_token('Brand Wessa'))
     return Client(auth)
 
-esiApi = getEsiApi()
 
-client = getAuthClient(esiApi)
+if __name__ == '__main__':
+    esiApi = getEsiApi()
+    client = getAuthClient(esiApi)
 
-charnames_op = esiApi.op['get_characters_character_id']
+    charnames_op = esiApi.op['get_characters_character_id']
+
+    result = client.request( charnames_op(character_id=1951242298) )
+    print(result.raw)
+    print(result.header)
+
+    assets_op = esiApi.op['get_characters_character_id_assets']
+    r2 = client.request( assets_op(character_id=1951242298) )
+    print(r2.raw)
 
 
-result = client.request( charnames_op(character_id=1951242298))
-
-print(result.raw)
-print(result.header)
 

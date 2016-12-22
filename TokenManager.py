@@ -12,7 +12,7 @@ from datetime import timedelta
 import Config
 
 
-TokenData = namedtuple("TokenData", "character_name character_id load_new_token access_token expiration")
+TokenData = namedtuple("TokenData", "character_name character_id refresh_token access_token expiration")
 
 class TokenError(RuntimeError):
     pass
@@ -35,16 +35,20 @@ class TokenManager:
         else:
             self.character_tokens = {}  # type: Dict[str, TokenData]
 
-    def get_token(self, character_name: str) -> str:
+
+    def get_access_token(self, character_name: str, refresh = False) -> str:
+        return self.get_token_data(character_name, refresh).access_token
+
+    def get_token_data(self, character_name: str, refresh = False) -> TokenData:
         try:
             t = self.character_tokens[character_name] #type: TokenData
         except KeyError:
             raise TokenError("No access token found for character %s" % (character_name,))
-        if t.access_token is None or t.expiration <= datetime.now():
-            t = self.load_new_token(t)
-        return t.access_token
+        if t.access_token is None or t.expiration <= datetime.now() or refresh:
+            t = self._load_new_token(t)
+        return t
 
-    def load_new_token(self, token: TokenData) -> TokenData:
+    def _load_new_token(self, token: TokenData) -> TokenData:
         ''' update access token using the refresh token.  Returns the updated Token'''
         if token.refresh_token is None:
             raise TokenError("refresh_token not found")
@@ -56,7 +60,7 @@ class TokenManager:
         # todo: check response status
         response_dict = json.loads(r.text)
         request_time = datetime.now()
-        new_token = token._replace(refresh_token = response_dict['load_new_token'],
+        new_token = token._replace(refresh_token = response_dict['refresh_token'],
                                    access_token = response_dict['access_token'],
                                    expiration = request_time + timedelta(seconds=response_dict['expires_in'])
                                    )
@@ -83,7 +87,7 @@ class TokenManager:
         character_id = self.verify_character_return_id(access_token, character_name)
         token = TokenData(character_name = character_name,
                           character_id = character_id,
-                          refresh_token = response_dict['load_new_token'],
+                          refresh_token = response_dict['refresh_token'],
                           access_token = response_dict['access_token'],
                           expiration = request_time + timedelta(response_dict['expires_in'])
                           )
@@ -143,9 +147,9 @@ if __name__ == '__main__':
     #access_code = 'WWpW6A4tm622_3_XcRzCc76FniL6cxPk5HTO51fPZuW3ygQ-4gMx9pcP4cKRZku00'
     #    now run the following, which will verify the access_code is for the character and persist the access tokens
     #TokenManager().create_token_from_access_code('Brand Wessa', access_code)
-    #    after that you can just use tokenManager.get_token(character_name) and it will look up what it needs
+    #    after that you can just use tokenManager.get_access_token(character_name) and it will look up what it needs
 
     #x = TokenManager().verify_character_return_id('H6pzpxrG9EH5fi0aaTVSJ82SM5l0y4FK3LPtyIvrtwyDZYzZoDAt3YxyNe4_xW2dzHSvFjllGrpX5WCNBADGJw2', 'Tansy Dabs')
     #print(x)
-    print( "BW = " + TokenManager().get_token('Brand Wessa'))
-    print( "TD = " + TokenManager().get_token('Tansy Dabs'))
+    print( "BW = " + TokenManager().get_access_token('Brand Wessa'))
+    print( "TD = " + TokenManager().get_access_token('Tansy Dabs', refresh=True))
