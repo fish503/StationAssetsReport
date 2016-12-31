@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from pprint import pprint
-from DataTypes import StationData, TypeData
+from DataTypes import StationData, TypeData, MarketPriceData, TypeId
+from typing import Optional, Dict, List
 
 import requests
 from requests.auth import AuthBase
@@ -65,18 +66,28 @@ class ESI_Api:
                 print("Error getting type data for type_id {}:\n{}".format(type_id, str(json)))
         return td
 
-    def get_region_id(self, region_name: str) -> int:
+    def get_region_id(self, region_name: str) -> Optional[int]:
         return _region_name_dict.get(region_name, None)
 
-    def get_region_name(self, region_id: int) -> str:
+    def get_region_name(self, region_id: int) -> Optional[str]:
         return _region_id_dict.get(region_id, None)
 
-    def market_prices(self, region_id: int):
-        price_list = self.cache_manager.get_price_list()
-        if not price_list:
-            price_list = self.call('/markets/prices/')
-            self.cache_manager.put_price_list(price_list, datetime.now() + timedelta(hour=1))  # TODO: get expiration from the headers
-        return price_list
+    def get_market_price(self, type_id: TypeId) -> float:
+        """ for now using global price.  In the future want to build a model of expected regional price based on
+            market orders and/or history.
+        """
+        price_dict = self.cache_manager.get_price_dict()
+        if not price_dict:
+            print("gettting market prices from api")
+            price_json = self.call('/markets/prices/')  # type: List[Dict]
+            price_list = map(lambda x: MarketPriceData(x['type_id'], x.get('average_price', None), x['adjusted_price']), price_json)
+            price_dict = {p.type_id: p for p in price_list}
+            self.cache_manager.put_price_dict(price_dict, datetime.now() + timedelta(hours=1))  # TODO: get expiration from the headers
+        pd = price_dict.get(type_id)
+        if not pd:
+            return 0.0  # no price found
+        else:
+            return pd.average_price or pd.adjusted_price
 
 
 _region_id_dict = {
@@ -146,7 +157,7 @@ _region_id_dict = {
     10000006: 'Wicked Creek'
 }
 
-_region_name_dict = { v:k for (k,v) in _region_id_dict.items() }
+_region_name_dict = {v: k for (k, v) in _region_id_dict.items()}
 
 
 class EveSSOAuth(AuthBase):
@@ -165,5 +176,8 @@ if __name__ == '__main__':
     api = ESI_Api('Tansy Dabs')
 
     # api.call('/characters/{character_id}/assets/')
-    assets = api.assets()
-    pprint(assets, indent=2, width=120, compact=False)
+    #assets = api.assets()
+    #pprint(assets, indent=2, width=120, compact=False)
+
+    print(api.get_market_price(12538))
+

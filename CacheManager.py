@@ -1,10 +1,11 @@
+import pickle
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import Config
 
-from typing import Dict, Optional
-from DataTypes import StationData, TypeData, MarketPriceData
+from typing import Dict, Optional, List
+from DataTypes import StationData, TypeData, MarketPriceData, TypeId
 
 
 class CacheManager:
@@ -31,14 +32,17 @@ class CacheManager:
     '''
 
     def __init__(self, data_dir=Config.dataDir):
+        self.data_dir = data_dir
+        self.market_prices_filename = data_dir / "market_prices.pickle"
         self.db_filename = data_dir / "cached_data.sqlite3"
         self.db_conn = sqlite3.connect(str(self.db_filename))
         tables = self.db_conn.execute("select name from sqlite_master where type='table'").fetchall()
         if len(tables) == 0:
             self.db_conn.executescript(CacheManager.__create_tables)
+
         self.station_dict = {}  # type: Dict[int, StationData]
         self.type_dict = {}  # type: Dict[int, TypeData]
-        self.price_list = None  # None, or (list of price dict, expiration date)
+        self.price_dict_expiration = None  # type: Optional[(Dict[TypeId, MarketPriceData], datetime)] # expiration date
 
     def get_station_data(self, station_id: int) -> Optional[StationData]:
         """ looks up station data from caches, returns None if not found """
@@ -56,14 +60,14 @@ class CacheManager:
         return None
 
     def put_station_data(self, station_data: StationData, persist=True):
-        ''' add to both in-memory and sqlite3 cache'''
+        """ add to both in-memory and sqlite3 cache"""
         self.station_dict[station_data.station_id] = station_data
         if persist:
             with self.db_conn as conn:  # auto commit or rollback
                 conn.execute('INSERT INTO stations VALUES (?, ?, ?)', station_data)
 
     def get_type_data(self, type_id) -> Optional[TypeData]:
-        ''' looks up type data from caches, returns None if not found'''
+        """ looks up type data from caches, returns None if not found"""
         # memory cache
         if type_id in self.type_dict:
             # print("from memory cache:", self.type_dict[type_id])
@@ -78,21 +82,32 @@ class CacheManager:
         return None
 
     def put_type_data(self, type_data: TypeData, persist=True):
-        ''' update caches with type_data.  If persist is False do not update sqlite3 cache'''
+        """ update caches with type_data.  If persist is False do not update sqlite3 cache"""
         self.type_dict[type_data.type_id] = type_data
         if persist:
             with self.db_conn as conn:  # auto commit or rollback
                 conn.execute('INSERT INTO types VALUES (?, ?, ?, ?, ?, ?)', type_data)
 
-    def get_price_list(self):
-        if self.price_list and self.price_list[1] > datetime.now():
-            return self.price_list[0]
-        with self.db_conn as conn:
-            pl = map(conn.execute('SELECT type_id, average_price, adjusted_price FROM market_prices').fetchall(), MarketPriceData._make)
-        raise NotImplementedError("get_price_list not complete")
+    def get_price_dict(self) -> Optional[Dict[TypeId, MarketPriceData]]:
+        if not self.price_dict_expiration:
+            if self.market_prices_filename.exists():
+                print("getting market prices from pickle file")
+                with self.market_prices_filename.open('rb') as f:
+                    self.price_dict_expiration = pickle.load(f)
+            else:
+                return None
+        if self.price_dict_expiration[1] > datetime.now():
+            return self.price_dict_expiration[0]
+        else:
+            print("pickled market prices expired")
+            return None  # expired
 
-    def put_price_list(self, price_list, param):
-        raise NotImplementedError()
+    def put_price_dict(self, price_dict: Dict[TypeId, MarketPriceData], expiration: datetime):
+        """ convert price_list to Dict[PriceId, MarketPriceData] and persist """
+        payload = (price_dict, expiration)
+        self.price_dict_expiration = payload
+        with self.market_prices_filename.open('wb') as f:
+            pickle.dump(payload, f)
 
 
 if __name__ == '__main__':
