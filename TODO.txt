@@ -1,0 +1,19 @@
+
+* Break out ships as a separate grouping in the report
+* combine ship value and ship contents into an aggregate ship value
+
+* use market orders and/or history to construct values
+
+* trip planner -- items where sell orders in one region > buy orders in another -- use a minimum profit margin threshold and
+    combine multiple offers together if possible
+* combine above entries with a route calcualator to produce a 'most profitable route'
+
+
+* add current wallet total to report, to produce a total net worth
+* create a historical record -- each time AssetReport is run store the current values.
+* generate graphs from historical record
+
+
+
+DONE:
+* Construct useful location name for non-station locations (ships, containers)  1/8/2017

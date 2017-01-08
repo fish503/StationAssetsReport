@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from pprint import pprint
-from DataTypes import StationData, TypeData, MarketPriceData, TypeId
+from DataTypes import StationData, TypeData, MarketPriceData, TypeId, MarketOrderData
 from typing import Optional, Dict, List
+from TokenManager import TokenData
+import xml.etree.ElementTree as ET
 
 import requests
 from requests.auth import AuthBase
@@ -13,25 +15,52 @@ from TokenManager import TokenManager
 class ESI_Api:
     def __init__(self, character_name: str, token_manager=TokenManager(), cache_manager=CacheManager.CacheManager()):
         self.cache_manager = cache_manager
+        self.token_manager = token_manager
+        self.character_name = character_name
         self.character_id = token_manager.get_token_data(character_name).character_id
         self.session = requests.Session()
         self.session.auth = EveSSOAuth(character_name, token_manager)
         self.session.params = {'datasource': 'tranquility'}
-        self.api_url = 'https://esi.tech.ccp.is/latest'
+        self.esi_api_url = 'https://esi.tech.ccp.is/latest'
+        self.xml_api_url = 'https://api.eveonline.com'  # 'https://api.testeveonline.com/'  #
 
     def call(self, path, *args, **kwargs):
-        r = self.session.get(self.api_url + path.format(*args, **kwargs))
-        return r.json()
+        r = self.session.get(self.esi_api_url + path.format(*args, **kwargs))
+        try:
+            if r.status_code != 200:
+                raise RuntimeError("error making ESI call")
+            return r.json()
+        except:
+            print('Error parsing response for {}'.format(path.format(*args, **kwargs)))
+            print(r.text)
+            print(r.headers)
+            exit(1)
+
+    def _process_asset_dict(self, asset_dict, singletons):
+        """ set the location_name and type_name of the assets item. If location is inside another item like a ship
+         or container processes the containing item first.  Lists the type and location of the containing object as
+         the location_name.
+        """
+        a = asset_dict
+        if 'location_name' in asset_dict:  # already set
+            pass
+        elif a['location_type'] == 'station':
+            a['location_name'] = self.get_station_data(a['location_id']).station_name
+        elif a['location_id'] in singletons:
+            s = singletons[a['location_id']]
+            self._process_asset_dict(s, singletons)  # ensure containing object has been processed
+            a['location_name'] = "{}@{}".format(s['type_name'], s['location_name'])
+        else:
+            a['location_name'] = "{}-{}".format(a['location_type'], a['location_id'])
+        if 'type_name' not in a:
+            a['type_name'] = self.get_type_data(a['type_id']).type_name
 
     def assets(self):
         asset_list = self.call('/characters/{}/assets/', self.character_id)
+        singletons = {x['item_id']: x for x in asset_list if x['is_singleton']}
         # api includes only location_id and type_id, fill in with names
         for a in asset_list:
-            if a['location_type'] == 'station':
-                a['location_name'] = self.get_station_data(a['location_id']).station_name
-            else:
-                a['location_name'] = "{}-{}".format(a['location_type'], a['location_id'])
-            a['type_name'] = self.get_type_data(a['type_id']).type_name
+            self._process_asset_dict(a, singletons)
         return asset_list
 
     def get_station_data(self, station_id) -> StationData:
@@ -89,6 +118,42 @@ class ESI_Api:
         else:
             return pd.average_price or pd.adjusted_price
 
+    def market_orders(self) -> List[MarketOrderData]:
+        response = requests.get(self.xml_api_url + '/char/MarketOrders.xml.aspx',
+                                params={'characterID': self.character_id,
+                                        'accessToken': self.token_manager.get_token_data(self.character_name).access_token,
+                                        'accessType': 'character'
+                                        }
+                                )
+        try:
+            root = ET.fromstring(response.text)
+            result = []
+            for child in root.findall('./result/rowset/row'):
+                a = child.attrib
+                order_data = MarketOrderData(int(a['orderID']),  # order_id
+                                             int(a['charID']),  # character_id
+                                             self.character_name,  # character_name
+                                             int(a['stationID']),  # station_id
+                                             self.get_station_data(int(a['stationID'])).station_name,  # station_name
+                                             int(a['volEntered']),  # vol_entered
+                                             int(a['volRemaining']),  # vol_remaining
+                                             int(a['orderState']),  # TODO: make enum order_state
+                                             int(a['typeID']),  # type_id
+                                             self.get_type_data(a['typeID']).type_name,  # type_name
+                                             int(a['range']),  # range
+                                             int(a['duration']),  # duration
+                                             float(a['price']),  # price
+                                             "buy" if a['bid'] == "1" else "sell",  # order_type
+                                             datetime.strptime(a['issued'], '%Y-%m-%d %H:%M:%S')  # issued
+                                             )
+                result.append(order_data)
+            return result
+
+        except:
+            print('Error parsing response for {}', response.url)
+            print(response.text)
+            print(response.headers)
+            exit(1)
 
 _region_id_dict = {
     10000054: 'Aridia',
@@ -172,12 +237,13 @@ class EveSSOAuth(AuthBase):
 
 
 if __name__ == '__main__':
-    # api = ESI_Api('Brand Wessa')
-    api = ESI_Api('Tansy Dabs')
+    api = ESI_Api('Brand Wessa')
+    # api = ESI_Api('Tansy Dabs')
 
     # api.call('/characters/{character_id}/assets/')
-    #assets = api.assets()
-    #pprint(assets, indent=2, width=120, compact=False)
+    assets = api.assets()
+    pprint(assets, indent=2, width=120, compact=False)
 
-    print(api.get_market_price(12538))
+    #  print(api.get_market_price(12538))
 
+    # pprint(api.market_orders())

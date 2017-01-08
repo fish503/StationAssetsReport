@@ -40,6 +40,7 @@ class TokenManager:
         self.character_tokens[token.character_name] = token
         with self.token_filename.open('wb') as f:
             pickle.dump(self.character_tokens, f)
+            f.flush()
 
     def get_access_token(self, character_name: str, refresh=False) -> str:
         return self.get_token_data(character_name, refresh).access_token
@@ -130,7 +131,10 @@ class TokenManager:
                 "esi-clones.read_clones.v1",
                 "esi-location.read_location.v1",
                 "esi-location.read_ship_type.v1",
-                "esi-ui.write_waypoint.v1"])
+                "esi-ui.write_waypoint.v1",
+                "characterMarketOrdersRead",
+                "characterWalletRead"
+            ])
                 })
         code_request_url = "https://login.eveonline.com/oauth/authorize/?" + query_string
         print(code_request_url)
@@ -140,14 +144,12 @@ class TokenManager:
 if __name__ == '__main__':
     # #####  Adding new character ######
     #    uncomment the following and run the function:
-    # TokenManager()._get_access_code()
-    #    there is no handler for the callback uri, so copy the access_code from the browser and set it below:
-    # access_code = 'WWpW6A4tm622_3_XcRzCc76FniL6cxPk5HTO51fPZuW3ygQ-4gMx9pcP4cKRZku00'
-    #    now run the following, which will verify the access_code is for the character and persist the access tokens
+    # TokenManager()._get_access_code() ; exit()
+    #    there is no handler for the callback uri, so copy the access_code from the browser and set it below
+    #    and then run the following, which will verify the access_code is for the character and persist the access tokens
+    # access_code = '5R1Lm_EgIZl-XTt4JycFCT_SUOKmR-Nw_HSAoubfSMkcbTkTkLW4w0nQ78wq7u940'
     # TokenManager().create_token_from_access_code('Brand Wessa', access_code)
     #    after that you can just use tokenManager.get_access_token(character_name) and it will look up what it needs
 
-    # x = TokenManager().verify_character_return_id('H6pzpxrG9EH5fi0aaTVSJ82SM5l0y4FK3LPtyIvrtwyDZYzZoDAt3YxyNe4_xW2dzHSvFjllGrpX5WCNBADGJw2', 'Tansy Dabs')
-    # print(x)
-    print("BW = " + TokenManager().get_access_token('Brand Wessa'))
+    print("BW = " + TokenManager().get_access_token('Brand Wessa', refresh=True))
     print("TD = " + TokenManager().get_access_token('Tansy Dabs', refresh=True))
