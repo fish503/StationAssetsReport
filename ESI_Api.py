@@ -53,9 +53,11 @@ class ESI_Api:
         else:
             a['location_name'] = "{}-{}".format(a['location_type'], a['location_id'])
         if 'type_name' not in a:
-            a['type_name'] = self.get_type_data(a['type_id']).type_name
+            type_data = self.get_type_data(a['type_id'])
+            a['type_name'] = type_data.type_name
+            a['category_id'] = type_data.category_id
 
-    def assets(self):
+    def assets(self) -> List[dict]:
         asset_list = self.call('/characters/{}/assets/', self.character_id)
         singletons = {x['item_id']: x for x in asset_list if x['is_singleton']}
         # api includes only location_id and type_id, fill in with names
@@ -155,6 +157,15 @@ class ESI_Api:
             print(response.headers)
             exit(1)
 
+    def wallet_balance(self) -> float:
+        wallet_list = self.call('/characters/{}/wallets/', self.character_id)  # type: List[dict]
+        # not sure why, but the response is coming back in 1/100 isk
+        return next(x['balance']/100.0 for x in wallet_list if x['wallet_id']==1000)  # return the balance of the character wallet
+
+    def put_historical_values(self, station_value: float, orders_value: float, ship_value: float, wallet_balance: float):
+        self.cache_manager.put_historical_values(self.character_id, station_value, orders_value, ship_value, wallet_balance)
+
+
 _region_id_dict = {
     10000054: 'Aridia',
     10000069: 'Black Rise',
@@ -240,6 +251,8 @@ if __name__ == '__main__':
     api = ESI_Api('Brand Wessa')
     # api = ESI_Api('Tansy Dabs')
 
+    pprint(api.wallet_balance())
+    exit()
     # api.call('/characters/{character_id}/assets/')
     assets = api.assets()
     pprint(assets, indent=2, width=120, compact=False)

@@ -12,14 +12,30 @@ def write_report(character_name):
     api = ESI_Api(character_name)
 
     asset_list = api.assets()
-    assets_by_location = defaultdict(list)
-    value_by_location = defaultdict(float)
+    assets_by_id = {a['item_id']: a for a in asset_list}
+
+    station_assets = defaultdict(list)    # items in stations, stored by location_name
+    ship_assets = defaultdict(list)       # items in ships, by ship's item id
+
     for a in asset_list:
-        location = a['location_name']
-        assets_by_location[location].append(a)
+        if a['is_singleton'] and a['category_id']==6:  # ships contain separate listing
+            ship_assets[a['item_id']].append(a)
+        elif a['location_type'] == 'station':
+            location = a['location_name']
+            station_assets[location].append(a)
+        else:
+            location_dict = assets_by_id[a['location_id']]
+            if location_dict['category_id']==6:
+                ship_assets[location_dict['item_id']].append(a)
+            else:  # add to station instead
+                station_assets[location_dict['location_name']].append(a)
         value_of_a = api.get_market_price(a['type_id']) * max(1, a.get('quantity', 0))
         a['total_value'] = value_of_a
-        value_by_location[location] += value_of_a
+
+
+
+    station_values = {loc: sum(i['total_value'] for i in items) for (loc, items) in station_assets.items()}
+    ship_values = {loc: sum(i['total_value'] for i in items) for (loc, items) in ship_assets.items()}
 
     orders_by_location = defaultdict(list)
     order_value_by_location = defaultdict(float)
@@ -31,9 +47,16 @@ def write_report(character_name):
         o_as_dict['total_value'] = value_of
         order_value_by_location[location] += value_of
 
-    combined_value_by_location = value_by_location.copy()  # copy will also be a defaultdict
-    for (k,v) in order_value_by_location.items():
-        combined_value_by_location[k] += v
+    combined_value_by_location = station_values.copy()  # copy will also be a defaultdict
+    for loc, value in order_value_by_location.items():
+        combined_value_by_location[loc] += value
+
+    station_value_total = sum(station_values.values())
+    orders_value_total = sum(order_value_by_location.values())
+    ship_value_total = sum(ship_values.values())
+    grand_total = station_value_total + orders_value_total + ship_value_total
+    wallet_balance = api.wallet_balance()
+    api.put_historical_values(station_value_total, orders_value_total, ship_value_total, wallet_balance)
 
 
     report_filename = Config.dataDir / 'Reports' / 'assets-{}-{:%Y-%m-%d-%H-%M}.txt'.format(character_name, datetime.now())
@@ -42,25 +65,38 @@ def write_report(character_name):
     with report_filename.open('w') as f:
         # output in reverse value order
         f.write("Asset Report for {}\n".format(character_name))
-        f.write('  Asset value       = {:>13,.0f} isk\n'.format(sum(value_by_location.values())))
-        f.write('  Open Orders value = {:>13,.0f} isk\n'.format(sum(order_value_by_location.values())))
-        f.write('  Total value       = {:>13,.0f} isk\n'.format(sum(combined_value_by_location.values())))
+        f.write('  Asset value       = {:>16,.0f} isk\n'.format(station_value_total))
+        f.write('  Open Orders value = {:>16,.0f} isk\n'.format(orders_value_total))
+        f.write('  Ships value       = {:>16,.0f} isk\n'.format(ship_value_total))
+        f.write('  Total value       = {:>16,.0f} isk\n'.format(grand_total))
+        f.write('\n')
+        f.write('  Wallet balance    = {:>16,.0f} isk\n'.format(wallet_balance))
+        f.write('  Net Worth         = {:>16,.0f} isk\n'.format(wallet_balance + grand_total))
         f.write('\n')
         for (location, value) in sorted(combined_value_by_location.items(), key=itemgetter(1), reverse=True):
             f.write('{}\n'.format(location))
-            f.write('  Asset value       = {:>13,.0f}\n'.format(value_by_location[location]))
+            f.write('  Asset value       = {:>13,.0f}\n'.format(station_values[location]))
             f.write('  Open Orders value = {:>13,.0f}\n'.format(order_value_by_location[location]))
-            f.write('  Total value       = {:>13,.0f}'.format(combined_value_by_location[location]))
-            if len(assets_by_location[location]) > 0:
-                f.write('\n     Asset Items:\n')
+            f.write('  Total value       = {:>13,.0f}\n'.format(combined_value_by_location[location]))
+            if len(station_assets[location]) > 0:
+                f.write('     Asset Items:\n')
                 f.write('\n'.join(
                     ["{:>13,.0f}  {:>8,d} x {}".format(a.get('total_value'), a.get('quantity',-1), a['type_name'])
-                      for a in sorted(assets_by_location[location], key=itemgetter('total_value'), reverse=True)]))
+                      for a in sorted(station_assets[location], key=itemgetter('total_value'), reverse=True)]))
             if len(orders_by_location[location]) > 0:
                 f.write('\n     Open Order Items:\n')
                 f.write('\n'.join(
                     ["{:>13,.0f}  {:>8,d} x {}".format(a.get('total_value'), a.get('vol_remaining',-1), a['type_name'])
                       for a in sorted(orders_by_location[location], key=itemgetter('total_value'), reverse=True)]))
+            f.write('\n\n')
+        f.write('Ships\n\n')
+        for (ship_id, value) in sorted(ship_values.items(), key=itemgetter(1), reverse=True):
+            f.write('{}@{}\n'.format(assets_by_id[ship_id]['type_name'],assets_by_id[ship_id]['location_name']))
+            f.write('  Ship value        = {:>13,.0f}\n'.format(value))
+            f.write('     Items:\n')
+            f.write('\n'.join(
+                    ["{:>13,.0f}  {:>8,d} x {}".format(a.get('total_value'), a.get('quantity',-1), a['type_name'])
+                      for a in sorted(ship_assets[ship_id], key=itemgetter('total_value'), reverse=True)]))
             f.write('\n\n')
         f.flush()
 
