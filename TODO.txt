@@ -3,11 +3,14 @@
 
 * trip planner -- items where sell orders in one region > buy orders in another -- use a minimum profit margin threshold and
     combine multiple offers together if possible
-* combine above entries with a route calcualator to produce a 'most profitable route'
+* combine above entries with a route calculator to produce a 'most profitable route'
 
 * generate graphs from historical record
 
 * create report as html page -- auto-open in browser
+
+* store token data in sqlite instead of pickle (avoids unpickle nametuple resolution problem)
+* set up callback handler to make adding new character tokens less manual
 
 DONE:
 * Construct useful location name for non-station locations (ships, containers)  1/8/2017
@@ -15,6 +18,7 @@ DONE:
 * combine ship value and ship contents into an aggregate ship value  1/9/2017
 * add current wallet total to report, to produce a total net worth  1/9/2017
 * create a historical record -- each time AssetReport is run store the current values. 1/9/2017
+* fix type_info lookup for skillbooks 1/20/2017
 
 
 

@@ -103,3 +103,4 @@ def write_report(character_name):
 if __name__ == '__main__':
     write_report('Tansy Dabs')
     write_report('Brand Wessa')
+    write_report('Tabash Masso')

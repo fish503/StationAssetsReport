@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from pprint import pprint
 from DataTypes import StationData, TypeData, MarketPriceData, TypeId, MarketOrderData
 from typing import Optional, Dict, List
-from TokenManager import TokenData
+from TokenManager import TokenData  # needed to allow unpickling of TokenData
 import xml.etree.ElementTree as ET
 
 import requests
@@ -75,26 +75,38 @@ class ESI_Api:
             print("api lookup:", sd)
         return sd
 
-    def get_type_data(self, type_id) -> TypeData:
+    def get_type_data(self, type_id, persist=True) -> TypeData:
         td = self.cache_manager.get_type_data(type_id)
         if not td:
-            json = self.call('/universe/types/{0}/', type_id)  # type: dict
-            # TODO: handle error cases
+            is_error = False
             try:
+                json = self.call('/universe/types/{0}/', type_id)  # type: dict
+                # some types, e.g. skill books, don't have the same fields
+                name = json.get('type_name') or json.get('name')
+                if name == None:
+                    name = 'unknown-{}'.format(type_id)
+                    is_error = True
+                description = json.get('type_description') or json.get('description')
+                if description == None:
+                    description = 'description not found'
+                    is_error = True
                 td = TypeData(type_id,
-                              json['type_name'],
-                              json['type_description'],
-                              json['group_id'],
-                              json['category_id'],
+                              name,
+                              description,
+                              json.get('group_id'),
+                              json.get('category_id', None),
                               json.get('icon_id', None)  # missing, optional graphic_id
                               )
-                self.cache_manager.put_type_data(td)
-                print("api lookup:", td)
-            except:
-                td = TypeData(type_id, 'unknown-' + str(type_id), 'unknown', 0, 0, None)
+            except Exception as e:
+                td = td or TypeData(type_id, 'unknown-' + str(type_id), 'unknown', 0, None, None)
+                is_error = True
+            if is_error:
+                # add to memory cache only so we don't look up via api again this session
+                print("Error getting type data for type_id {}:\nresponse: {}\nException: {}".format(type_id, str(json), e))
                 self.cache_manager.put_type_data(td, persist=False)
-                # add to memory cache only so we don't look up via api again
-                print("Error getting type data for type_id {}:\n{}".format(type_id, str(json)))
+            else:
+                self.cache_manager.put_type_data(td, persist=persist)
+                print("api lookup:", td)
         return td
 
     def get_region_id(self, region_name: str) -> Optional[int]:
@@ -248,12 +260,14 @@ class EveSSOAuth(AuthBase):
 
 
 if __name__ == '__main__':
-    api = ESI_Api('Brand Wessa')
+    # api = ESI_Api('Brand Wessa')
     # api = ESI_Api('Tansy Dabs')
+    api = ESI_Api('Tabash Masso')
+
+    pprint(api.get_type_data(24241, persist=False))
+
 
     pprint(api.wallet_balance())
-    exit()
-    # api.call('/characters/{character_id}/assets/')
     assets = api.assets()
     pprint(assets, indent=2, width=120, compact=False)
 

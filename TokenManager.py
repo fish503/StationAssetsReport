@@ -144,12 +144,13 @@ class TokenManager:
 if __name__ == '__main__':
     # #####  Adding new character ######
     #    uncomment the following and run the function:
-    # TokenManager()._get_access_code() ; exit()
+    #  TokenManager()._get_access_code() ; exit()
     #    there is no handler for the callback uri, so copy the access_code from the browser and set it below
     #    and then run the following, which will verify the access_code is for the character and persist the access tokens
-    # access_code = '5R1Lm_EgIZl-XTt4JycFCT_SUOKmR-Nw_HSAoubfSMkcbTkTkLW4w0nQ78wq7u940'
-    # TokenManager().create_token_from_access_code('Brand Wessa', access_code)
+    #access_code = 'PvozyqVZlEcVuDr8lzaLp5BIgPB_RF33l_5SMb1GjQjoIfUum5Jflapb96qlTdj20'
+    #TokenManager().create_token_from_access_code('Tabash Masso', access_code)
     #    after that you can just use tokenManager.get_access_token(character_name) and it will look up what it needs
 
-    print("BW = " + TokenManager().get_access_token('Brand Wessa', refresh=True))
-    print("TD = " + TokenManager().get_access_token('Tansy Dabs', refresh=True))
+    print("BW = " + TokenManager().get_access_token('Brand Wessa'))
+    print("TD = " + TokenManager().get_access_token('Tansy Dabs'))
+    print("TM = " + TokenManager().get_access_token('Tabash Masso', refresh=True))
