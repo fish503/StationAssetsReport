@@ -47,7 +47,8 @@ def write_report(character_name):
         o_as_dict['total_value'] = value_of
         order_value_by_location[location] += value_of
 
-    combined_value_by_location = station_values.copy()  # copy will also be a defaultdict
+    combined_value_by_location = defaultdict(float)
+    combined_value_by_location.update(station_values)
     for loc, value in order_value_by_location.items():
         combined_value_by_location[loc] += value
 
@@ -75,7 +76,7 @@ def write_report(character_name):
         f.write('\n')
         for (location, value) in sorted(combined_value_by_location.items(), key=itemgetter(1), reverse=True):
             f.write('{}\n'.format(location))
-            f.write('  Asset value       = {:>13,.0f}\n'.format(station_values[location]))
+            f.write('  Asset value       = {:>13,.0f}\n'.format(station_values.get(location, 0.0)))
             f.write('  Open Orders value = {:>13,.0f}\n'.format(order_value_by_location[location]))
             f.write('  Total value       = {:>13,.0f}\n'.format(combined_value_by_location[location]))
             if len(station_assets[location]) > 0:

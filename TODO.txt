@@ -12,6 +12,8 @@
 * store token data in sqlite instead of pickle (avoids unpickle nametuple resolution problem)
 * set up callback handler to make adding new character tokens less manual
 
+* log file with auto-rotation
+
 DONE:
 * Construct useful location name for non-station locations (ships, containers)  1/8/2017
 * Break out ships as a separate grouping in the report  1/9/2017

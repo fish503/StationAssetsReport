@@ -69,8 +69,9 @@ class ESI_Api:
         sd = self.cache_manager.get_station_data(station_id)
         if not sd:
             json = self.call('/universe/stations/{0}/', station_id)
+            print(json)
             # TODO: handle error cases
-            sd = StationData(station_id, json['station_name'], json['solar_system_id'])
+            sd = StationData(station_id, json['name'], json['system_id'])
             self.cache_manager.put_station_data(sd)
             print("api lookup:", sd)
         return sd
@@ -79,6 +80,7 @@ class ESI_Api:
         td = self.cache_manager.get_type_data(type_id)
         if not td:
             is_error = False
+            print("doing api lookup for type_id {}".format(type_id))
             try:
                 json = self.call('/universe/types/{0}/', type_id)  # type: dict
                 # some types, e.g. skill books, don't have the same fields
