@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, date
 import Config
 
 from typing import Dict, Optional, List
-from DataTypes import StationData, TypeData, MarketPriceData, TypeId
+from DataTypes import StationData, TypeData, MarketPriceData, TypeId, AssetValues
 
 
 class CacheManager:
@@ -126,6 +126,13 @@ class CacheManager:
             conn.execute("INSERT OR REPLACE INTO historical_values VALUES (?, ?, ?, ?, ?, ?)",
                          (date.today(), character_id, station_value, orders_value, ship_value, wallet_balance))
 
+    def get_historical_values(self, character_id) -> List[AssetValues]:
+        """ store the historical values, uses today date, replaces if alread present (i.e. last entry of the day
+            is persisted """
+        with self.db_conn as conn:
+            results = conn.execute("SELECT * FROM historical_values WHERE character_id=?",
+                         (character_id, ))
+        return [AssetValues._make(x) for x in results.fetchall()]
 
 
 if __name__ == '__main__':

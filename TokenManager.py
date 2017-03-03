@@ -54,6 +54,9 @@ class TokenManager:
             t = self._load_new_token(t)
         return t
 
+    def get_character_id(self, character_name: str):
+        return self.character_tokens[character_name].character_id
+
     def _load_new_token(self, token: TokenData) -> TokenData:
         """ update access token using the refresh token.  Returns the updated token """
         if token.refresh_token is None:

@@ -8,3 +8,6 @@ MarketOrderData = namedtuple('MarketOrderData', 'order_id character_id character
 
 TypeId = NewType('TypeId', int)
 StationId = NewType('StationId', int)
+
+AssetValues = namedtuple('AssetValues', 'date character_id station_value orders_value ship_value wallet_balance')
+
