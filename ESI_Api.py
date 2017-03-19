@@ -160,6 +160,7 @@ class ESI_Api:
                                              int(a['duration']),  # duration
                                              float(a['price']),  # price
                                              "buy" if a['bid'] == "1" else "sell",  # order_type
+                                             float(a['escrow']),
                                              datetime.strptime(a['issued'], '%Y-%m-%d %H:%M:%S')  # issued
                                              )
                 result.append(order_data)
@@ -176,8 +177,8 @@ class ESI_Api:
         # not sure why, but the response is coming back in 1/100 isk
         return next(x['balance']/100.0 for x in wallet_list if x['wallet_id']==1000)  # return the balance of the character wallet
 
-    def put_historical_values(self, station_value: float, orders_value: float, ship_value: float, wallet_balance: float):
-        self.cache_manager.put_historical_values(self.character_id, station_value, orders_value, ship_value, wallet_balance)
+    def put_historical_values(self, station_value: float, orders_value: float, escrow_value: float, ship_value: float, wallet_balance: float):
+        self.cache_manager.put_historical_values(self.character_id, station_value, orders_value, escrow_value, ship_value, wallet_balance)
 
 
 _region_id_dict = {
@@ -263,8 +264,10 @@ class EveSSOAuth(AuthBase):
 
 if __name__ == '__main__':
     # api = ESI_Api('Brand Wessa')
-    # api = ESI_Api('Tansy Dabs')
-    api = ESI_Api('Tabash Masso')
+    api = ESI_Api('Tansy Dabs')
+    # api = ESI_Api('Tabash Masso')
+
+    api.market_orders()
 
     pprint(api.get_type_data(24241, persist=False))
 

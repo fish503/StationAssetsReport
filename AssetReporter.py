@@ -39,13 +39,16 @@ def write_report(character_name):
 
     orders_by_location = defaultdict(list)
     order_value_by_location = defaultdict(float)
-    for o in (o for o in api.market_orders() if o.order_type == 'sell' and o.vol_remaining > 0):
+    market_orders = api.market_orders()
+    for o in (o for o in market_orders if o.order_type == 'sell' and o.vol_remaining > 0):
         location = o.station_name
         o_as_dict = o._asdict()  # convert to dict to match assets and to add a field
         orders_by_location[location].append(o_as_dict)
         value_of = api.get_market_price(o.type_id) * max(1, o.vol_remaining)
         o_as_dict['total_value'] = value_of
         order_value_by_location[location] += value_of
+
+    escrow_total = sum(o.escrow for o in market_orders)
 
     combined_value_by_location = defaultdict(float)
     combined_value_by_location.update(station_values)
@@ -57,7 +60,7 @@ def write_report(character_name):
     ship_value_total = sum(ship_values.values())
     grand_total = station_value_total + orders_value_total + ship_value_total
     wallet_balance = api.wallet_balance()
-    api.put_historical_values(station_value_total, orders_value_total, ship_value_total, wallet_balance)
+    api.put_historical_values(station_value_total, orders_value_total, escrow_total, ship_value_total, wallet_balance)
 
 
     report_filename = Config.dataDir / 'Reports' / 'assets-{}-{:%Y-%m-%d-%H-%M}.txt'.format(character_name, datetime.now())
@@ -68,6 +71,7 @@ def write_report(character_name):
         f.write("Asset Report for {}\n".format(character_name))
         f.write('  Asset value       = {:>16,.0f} isk\n'.format(station_value_total))
         f.write('  Open Orders value = {:>16,.0f} isk\n'.format(orders_value_total))
+        f.write('  Escrow value      = {:>16,.0f} isk\n'.format(escrow_total))
         f.write('  Ships value       = {:>16,.0f} isk\n'.format(ship_value_total))
         f.write('  Total value       = {:>16,.0f} isk\n'.format(grand_total))
         f.write('\n')

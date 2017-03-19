@@ -28,10 +28,18 @@ class MoneyChart:
             y=y_vals,
             text=['{:,.2f}'.format(x) for x in values],
             hoverinfo='x+text',
-            mode='lines',
-            line=dict(width=0.5,
-                      color=color),
-            fill='tonexty'
+            mode='lines+markers',
+            line={
+                'width': 0.5,
+                'color': color
+            },
+            fill='tonexty',
+            marker={
+                'symbol': 'circle',
+                'opacity': 1,
+                'size': 6,
+                'color': color
+            }
         )
 
 
@@ -40,13 +48,15 @@ class MoneyChart:
         dates = [x.date for x in totals]
         station_val = [x.station_value for x in totals]
         orders_val = [x.orders_value for x in totals]
+        escrow_val = [x.escrow_value for x in totals]
         ship_val = [x.ship_value for x in totals]
         wallet_val = [x.wallet_balance for x in totals]
-        d1 = self.generate_data(dates, station_val, 'station value', 'rgb(227,119,194,100)')
-        d2 = self.generate_data(dates, orders_val, 'orders value', 'rgb(250, 25, 25)', cumulative_with=d1)
-        d3 = self.generate_data(dates, ship_val, 'ships value', 'rgb(12, 12, 250', cumulative_with=d2)
-        d4 = self.generate_data(dates, wallet_val, 'wallet balance', 'rgb(77, 255, 72', cumulative_with=d3)
-        data = [d1, d2, d3, d4]
+        d1 = self.generate_data(dates, station_val, 'station value', 'rgb(227,119,194,75)')
+        d2 = self.generate_data(dates, orders_val, 'orders value', 'rgb(250, 25, 25, 75)', cumulative_with=d1)
+        d3 = self.generate_data(dates, escrow_val, 'escrow value', 'rgb(50, 125, 25, 75)', cumulative_with=d2)
+        d4 = self.generate_data(dates, ship_val, 'ships value', 'rgb(12, 12, 250, 75', cumulative_with=d3)
+        d5 = self.generate_data(dates, wallet_val, 'wallet balance', 'rgb(77, 255, 72, 75', cumulative_with=d4)
+        data = [d1, d2, d3, d4, d5]
         fig = graph_objs.Figure(data=data, layout={'title': 'Asset Values for {}'.format(character_name)})
         plotly.plot(fig, filename='{} Assets'.format(character_name), fileopt='overwrite')
 

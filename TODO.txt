@@ -21,6 +21,7 @@ DONE:
 * create a historical record -- each time AssetReport is run store the current values. 1/9/2017
 * fix type_info lookup for skillbooks 1/20/2017
 * generate graphs from historical record
+* add escrow to historical record and graph  3/18/2017
 
 
 

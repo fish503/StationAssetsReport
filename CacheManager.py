@@ -37,6 +37,7 @@ class CacheManager:
        orders_value REAL,
        ship_value REAL,
        wallet_balance REAL,
+       escrow_value REAL,
        CONSTRAINT pk PRIMARY KEY (value_date, character_id)
     );
     '''
@@ -119,12 +120,18 @@ class CacheManager:
         with self.market_prices_filename.open('wb') as f:
             pickle.dump(payload, f)
 
-    def put_historical_values(self, character_id, station_value: float, orders_value: float, ship_value: float, wallet_balance: float):
+    def put_historical_values(self,
+                              character_id,
+                              station_value: float,
+                              orders_value: float,
+                              escrow_value: float,
+                              ship_value: float,
+                              wallet_balance: float):
         """ store the historical values, uses today date, replaces if alread present (i.e. last entry of the day
             is persisted """
         with self.db_conn as conn:
-            conn.execute("INSERT OR REPLACE INTO historical_values VALUES (?, ?, ?, ?, ?, ?)",
-                         (date.today(), character_id, station_value, orders_value, ship_value, wallet_balance))
+            conn.execute("INSERT OR REPLACE INTO historical_values VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (date.today(), character_id, station_value, orders_value, ship_value, wallet_balance, escrow_value))
 
     def get_historical_values(self, character_id) -> List[AssetValues]:
         """ store the historical values, uses today date, replaces if alread present (i.e. last entry of the day
@@ -139,7 +146,6 @@ if __name__ == '__main__':
     cm = CacheManager()
     #
     # print(cm.db_conn.execute("select name from sqlite_master where type='table'").fetchall())
-
 
     print(cm.get_station_data(60000028))
     print(cm.get_station_data(60000112))
