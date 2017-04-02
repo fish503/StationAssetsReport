@@ -4,6 +4,7 @@ from operator import itemgetter
 from pprint import pprint
 
 import Config
+from MoneyChart import MoneyChart
 from TokenManager import TokenData  # required for unpickling tokens
 from ESI_Api import ESI_Api
 
@@ -58,7 +59,7 @@ def write_report(character_name):
     station_value_total = sum(station_values.values())
     orders_value_total = sum(order_value_by_location.values())
     ship_value_total = sum(ship_values.values())
-    grand_total = station_value_total + orders_value_total + ship_value_total
+    grand_total = escrow_total + station_value_total + orders_value_total + ship_value_total
     wallet_balance = api.wallet_balance()
     api.put_historical_values(station_value_total, orders_value_total, escrow_total, ship_value_total, wallet_balance)
 
@@ -109,3 +110,9 @@ if __name__ == '__main__':
     write_report('Tansy Dabs')
     write_report('Brand Wessa')
     write_report('Tabash Masso')
+
+    mc = MoneyChart()
+
+    mc.generate_chart('Brand Wessa')
+    mc.generate_chart('Tansy Dabs')
+    mc.generate_chart('Tabash Masso')

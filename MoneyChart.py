@@ -44,7 +44,7 @@ class MoneyChart:
 
 
     def generate_chart(self, character_name):
-        totals = mc.get_totals_for_character(character_name)
+        totals = self.get_totals_for_character(character_name)
         dates = [x.date for x in totals]
         station_val = [x.station_value for x in totals]
         orders_val = [x.orders_value for x in totals]

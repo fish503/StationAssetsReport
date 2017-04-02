@@ -13,6 +13,12 @@
 
 * log file with auto-rotation
 
+* replace ESI service call with static db lookup for type and station data
+
+* cleanup path planner -- find a round trip route that optimizes number of jumps+stops to up items from stations and return
+    to the market hub.  Try and maximize value of items picked up, minimize number of jumps, and do not exceed cargo volume
+    of the ship doing the pickup.  Exclude large items like ships and station containers.
+
 DONE:
 * Construct useful location name for non-station locations (ships, containers)  1/8/2017
 * Break out ships as a separate grouping in the report  1/9/2017
