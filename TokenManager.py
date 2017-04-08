@@ -154,6 +154,6 @@ if __name__ == '__main__':
     #TokenManager().create_token_from_access_code('Tabash Masso', access_code)
     #    after that you can just use tokenManager.get_access_token(character_name) and it will look up what it needs
 
-    print("BW = " + TokenManager().get_access_token('Brand Wessa'))
+    print("BW = " + TokenManager().get_access_token('Brand Wessa', refresh=True))
     print("TD = " + TokenManager().get_access_token('Tansy Dabs'))
     print("TM = " + TokenManager().get_access_token('Tabash Masso', refresh=True))

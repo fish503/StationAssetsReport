@@ -40,22 +40,26 @@ class ESI_Api:
         """ set the location_name and type_name of the assets item. If location is inside another item like a ship
          or container processes the containing item first.  Lists the type and location of the containing object as
          the location_name.
+         also set station_id if location_type is a station, will also be set if item is in a container in a station
         """
         a = asset_dict
         if 'location_name' in asset_dict:  # already set
             pass
         elif a['location_type'] == 'station':
             a['location_name'] = self.get_station_data(a['location_id']).station_name
+            a['station_id'] = a['location_id']
         elif a['location_id'] in singletons:
             s = singletons[a['location_id']]
             self._process_asset_dict(s, singletons)  # ensure containing object has been processed
             a['location_name'] = "{}@{}".format(s['type_name'], s['location_name'])
+            a['station_id'] = s['station_id']
         else:
             a['location_name'] = "{}-{}".format(a['location_type'], a['location_id'])
         if 'type_name' not in a:
             type_data = self.get_type_data(a['type_id'])
             a['type_name'] = type_data.type_name
             a['category_id'] = type_data.category_id
+            a['group_id'] = type_data.group_id
 
     def assets(self) -> List[dict]:
         asset_list = self.call('/characters/{}/assets/', self.character_id)
@@ -263,9 +267,16 @@ class EveSSOAuth(AuthBase):
 
 
 if __name__ == '__main__':
-    # api = ESI_Api('Brand Wessa')
-    api = ESI_Api('Tansy Dabs')
+    api = ESI_Api('Brand Wessa')
+    #api = ESI_Api('Tansy Dabs')
     # api = ESI_Api('Tabash Masso')
+
+    assets = api.assets()
+    pprint(assets, indent=2, width=120, compact=False)
+    z = frozenset(x['location_name'] for x in assets if 'station_id' in x)
+    print(len(z))
+    print('\n'.join(z))
+    exit()
 
     api.market_orders()
 
@@ -273,8 +284,6 @@ if __name__ == '__main__':
 
 
     pprint(api.wallet_balance())
-    assets = api.assets()
-    pprint(assets, indent=2, width=120, compact=False)
 
     #  print(api.get_market_price(12538))
 

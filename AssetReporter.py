@@ -5,12 +5,14 @@ from pprint import pprint
 
 import Config
 from MoneyChart import MoneyChart
+from StaticDataAccessor import StaticDataAccessor
 from TokenManager import TokenData  # required for unpickling tokens
 from ESI_Api import ESI_Api
 
 
 def write_report(character_name):
     api = ESI_Api(character_name)
+    sda = StaticDataAccessor()
 
     asset_list = api.assets()
     assets_by_id = {a['item_id']: a for a in asset_list}
@@ -30,13 +32,16 @@ def write_report(character_name):
                 ship_assets[location_dict['item_id']].append(a)
             else:  # add to station instead
                 station_assets[location_dict['location_name']].append(a)
-        value_of_a = api.get_market_price(a['type_id']) * max(1, a.get('quantity', 0))
+        quantity = max(1, a.get('quantity', 0))
+        value_of_a = api.get_market_price(a['type_id']) * quantity
         a['total_value'] = value_of_a
-
-
+        volume_of_a = sda.get_type_volume(a['type_id']) * quantity
+        a['total_volume'] = volume_of_a
 
     station_values = {loc: sum(i['total_value'] for i in items) for (loc, items) in station_assets.items()}
     ship_values = {loc: sum(i['total_value'] for i in items) for (loc, items) in ship_assets.items()}
+
+    station_volume = {loc: sum(i['total_volume'] for i in items) for (loc, items) in station_assets.items()}
 
     orders_by_location = defaultdict(list)
     order_value_by_location = defaultdict(float)
@@ -45,9 +50,12 @@ def write_report(character_name):
         location = o.station_name
         o_as_dict = o._asdict()  # convert to dict to match assets and to add a field
         orders_by_location[location].append(o_as_dict)
-        value_of = api.get_market_price(o.type_id) * max(1, o.vol_remaining)
+        vol_remaining = max(1, o.vol_remaining)
+        value_of = api.get_market_price(o.type_id) * vol_remaining
         o_as_dict['total_value'] = value_of
         order_value_by_location[location] += value_of
+        volume_of = sda.get_type_volume(o.type_id) * vol_remaining
+        o_as_dict['total_volume'] = volume_of
 
     escrow_total = sum(o.escrow for o in market_orders)
 
@@ -84,15 +92,16 @@ def write_report(character_name):
             f.write('  Asset value       = {:>13,.0f}\n'.format(station_values.get(location, 0.0)))
             f.write('  Open Orders value = {:>13,.0f}\n'.format(order_value_by_location[location]))
             f.write('  Total value       = {:>13,.0f}\n'.format(combined_value_by_location[location]))
+            f.write('  Total volume      = {:>13,.0f} m^2\n'.format(station_volume.get(location, 0.0)))
             if len(station_assets[location]) > 0:
                 f.write('     Asset Items:\n')
                 f.write('\n'.join(
-                    ["{:>13,.0f}  {:>8,d} x {}".format(a.get('total_value'), a.get('quantity',-1), a['type_name'])
+                    ["{:>13,.0f} [{:10,.1f} m^2] {:>8,d} x {}".format(a.get('total_value'), a.get('total_volume'), a.get('quantity',-1), a['type_name'])
                       for a in sorted(station_assets[location], key=itemgetter('total_value'), reverse=True)]))
             if len(orders_by_location[location]) > 0:
                 f.write('\n     Open Order Items:\n')
                 f.write('\n'.join(
-                    ["{:>13,.0f}  {:>8,d} x {}".format(a.get('total_value'), a.get('vol_remaining',-1), a['type_name'])
+                    ["{:>13,.0f} [{:10,.1f} m^2]  {:>8,d} x {}".format(a.get('total_value'), a.get('total_volume'), a.get('vol_remaining',-1), a['type_name'])
                       for a in sorted(orders_by_location[location], key=itemgetter('total_value'), reverse=True)]))
             f.write('\n\n')
         f.write('Ships\n\n')
@@ -107,9 +116,9 @@ def write_report(character_name):
         f.flush()
 
 if __name__ == '__main__':
+    write_report('Tabash Masso')
     write_report('Tansy Dabs')
     write_report('Brand Wessa')
-    write_report('Tabash Masso')
 
     mc = MoneyChart()
 
