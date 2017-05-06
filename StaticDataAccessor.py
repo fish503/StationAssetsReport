@@ -3,6 +3,7 @@ import sqlite3
 from datetime import datetime, timedelta, date
 
 import itertools
+from functools import reduce
 from operator import itemgetter
 
 import Config
@@ -24,19 +25,8 @@ class StaticDataAccessor:
             raise Exception('no tables found in db file ' + self.db_filename)
 
     def get_type_data(self, type_id) -> Optional[TypeData]:
-        """ looks up type data from caches, returns None if not found"""
-        # memory cache
-        if type_id in self.type_dict:
-            # print("from memory cache:", self.type_dict[type_id])
-            return self.type_dict[type_id]
-        # sqlite3 cache
-        row = self.db_conn.execute('select type_id, type_name, type_description, group_id, category_id, icon_id from types where type_id=?', (type_id,)).fetchone()
-        if row:
-            d = TypeData._make(row)
-            print("from sqlite3 cache: ", d)
-            self.type_dict[type_id] = d
-            return d
-        return None
+        """ TODO: migrate from ESI_API """
+
 
     def get_system_jumps(self) -> Dict[int, FrozenSet[int]]:
         rows = self.db_conn.execute(
@@ -55,6 +45,17 @@ class StaticDataAccessor:
         row = self.db_conn.execute(
             'select solarSystemID from staStations where stationID=?', (station_id,)).fetchone()
         return row[0]
+
+    def get_station_name(self, station_id: int):
+        row = self.db_conn.execute(
+            'select stationName from staStations where stationID=?', (station_id,)).fetchone()
+        return row[0]
+
+    def get_system_name(self, solar_system_id):
+        row = self.db_conn.execute(
+            'select solarSystemName from mapSolarSystems where solarSystemID=?', (solar_system_id,)).fetchone()
+        return row[0]
+
 
 if __name__ == '__main__':
     sda = StaticDataAccessor()

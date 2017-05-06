@@ -136,7 +136,8 @@ class TokenManager:
                 "esi-location.read_ship_type.v1",
                 "esi-ui.write_waypoint.v1",
                 "characterMarketOrdersRead",
-                "characterWalletRead"
+                "characterWalletRead",
+                "esi-ui.write_waypoint.v1"
             ])
                 })
         code_request_url = "https://login.eveonline.com/oauth/authorize/?" + query_string
