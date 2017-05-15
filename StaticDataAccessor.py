@@ -37,9 +37,13 @@ class StaticDataAccessor:
         return result
 
     def get_type_volume(self, type_id: int):
-        row = self.db_conn.execute(
-            'select volume from invTypes where typeID=?', (type_id,)).fetchone()
-        return row[0]
+        try:
+            row = self.db_conn.execute(
+                'select volume from invTypes where typeID=?', (type_id,)).fetchone()
+            return row[0]
+        except:
+            print("unknown type {}".format(type_id))
+            return 0
 
     def get_system_for_station(self, station_id: int):
         row = self.db_conn.execute(
