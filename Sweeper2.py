@@ -24,7 +24,6 @@ StationInfo = namedtuple('StationInfo', 'system_id station_id total_value total_
 SolutionInfo = namedtuple('SolutionInfo',
                           'shortest_path station_list value_per_jump total_value total_volume')
 
-
 class Sweeper2:
     """
     Generates a round trip path that optimizes number of jumps+stops to pick up items from stations and return
@@ -42,17 +41,17 @@ class Sweeper2:
        each jump and each station counts as a step on the path
        best solution is a complete load with maximum (isk/step)
     """
-
     def __init__(self,
                  allowed_jumps: Dict[SystemId, SystemSet],
                  station_info: Iterable[StationInfo],
                  starting_station_id: StationId,
                  starting_system_id: SystemId,
                  max_volume: int,
-                 duration_in_seconds: int):
+                 duration_in_seconds: int,
+                 max_segment_length = 12):
         self.allowed_jumps = allowed_jumps
         self.ending_time = datetime.now() + timedelta(seconds=duration_in_seconds)
-        self.distance_maps = dict()
+        self.distance_maps = dict() # type: Dict[SystemId, Dict[SystemId]]
         self.known_system_sets = dict() # type: Dict[SystemSet, int] tracks system combinations we have already processed
                                         # and the length of the shortest path through them we've seen
 
@@ -67,7 +66,8 @@ class Sweeper2:
         self.starting_system_id = starting_system_id
         self.starting_station_id = starting_station_id
         self.max_volume = max_volume
-
+        self.max_segment_length = max_segment_length # limit searches between waypoints to this distance.  Systems
+                                                     # further away can be reached if there are intermediate waypoints
     def get_related_station_infos(self, systems: Iterable[SystemId]):
         return chain.from_iterable(self.station_info_by_system_id[x] for x in systems)
 
@@ -140,14 +140,22 @@ class Sweeper2:
             # TODO: exclude reverse-permutations (a-b-c == c-b-a)
             waypoints = [self.starting_system_id] + list(p) + [self.starting_system_id]
             distance = 0
-            for x, y in zip(waypoints[0:-1], waypoints[1:]):
-                distance += self.get_distance(x,y)
-                if distance > shortest_length: break
-            print("path-length {} = {}".format(waypoints, distance))
+            failure_reason = None
+            for a, b in zip(waypoints[0:-1], waypoints[1:]):
+                d = self.get_distance(a, b)
+                if d is None:
+                    failure_reason = "max segment distance exceeded"
+                    distance = 99999
+                    break
+                distance += d
+                if distance > shortest_length:
+                    failure_reason = "current shortest exceeded"
+                    break
+            print("path-length {} = {}".format(waypoints, failure_reason or distance))
             if distance < shortest_length:
                 shortest_length = distance
                 shortest_waypoints = [waypoints]
-            elif distance == shortest_length:
+            elif distance == shortest_length and shortest_length < 99999:
                 shortest_waypoints += [waypoints]
         # we now have the order of waypoints that give us shortest paths, now expand the points in between to get
         # full paths
@@ -157,7 +165,7 @@ class Sweeper2:
         filtered_paths = []
         for p in paths:
             system_set = frozenset(p)
-            if system_set in self.known_system_sets.keys():
+            if system_set in self.known_system_sets:
                 if self.known_system_sets[system_set] < len(p):
                     print("!!! unexpected result, new path shorter than know system path. {} vs {}: {}",
                           len(p), self.known_system_sets[system_set], p)
@@ -173,12 +181,12 @@ class Sweeper2:
 
     def get_distance(self, start, end) -> int:
         if start in self.distance_maps:
-            return self.distance_maps[start][end]
+            return self.distance_maps[start].get(end, None)
         elif end in self.distance_maps:
-            return self.distance_maps[end][start]
+            return self.distance_maps[end].get(start, None)
         else:
             self.distance_maps[start] = self.build_distance_map(start)
-            return self.distance_maps[start][end]
+            return self.distance_maps[start].get(end, None)
 
     def expand_waypoints(self, waypoints) -> List[List[SystemId]]:
         """ expand the waypoints into full paths -- always uses shortest route between waypoints.  If multiple paths 
@@ -230,7 +238,7 @@ class Sweeper2:
         systems = set((starting_system_id,))  # type: Set[SystemId]
         new_neighbors = set()
         new_distance = 1
-        while len(systems) > 0 and new_distance <= 40:
+        while len(systems) > 0 and new_distance <= self.max_segment_length:
             for sys in systems:
                 new_neighbors.update(self.allowed_jumps[sys].difference(distances.keys()))
             for n in new_neighbors:
@@ -261,18 +269,6 @@ def _get_station_info(api: ESI_Api, sda: StaticDataAccessor.StaticDataAccessor) 
             station_volume += volume * quantity
         result.append(StationInfo(system_id, station_id, station_value, station_volume))
     return result
-
-
-def print_solution_info(solution: SolutionInfo):
-    if solution is None:
-        print("None")
-        return
-    print('#Systems: {}, #Path: {}, #Stations: {}, Value: {}, Value/Jump: {}'.format(
-        len(solution.systems_set),
-        len(solution.shortest_path or []),
-        len(solution.station_list or []),
-        solution.total_value,
-        solution.value_per_jump), flush=True)
 
 
 def  get_solution_path(solution: SolutionInfo, api: ESI_Api, sda: StaticDataAccessor.StaticDataAccessor) -> Iterable[str]:
@@ -325,7 +321,7 @@ if __name__ == '__main__':
                 station_id,
                 system_id,
                 9600, # max volume
-                120)  # duration in seconds
+                25)  # duration in seconds
 
     total_value_solution, value_per_jump_solution = s.get_plan_v2()
     print("Total Value Solution")
