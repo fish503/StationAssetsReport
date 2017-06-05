@@ -27,7 +27,7 @@ class TestSweeper2(TestCase):
         }
 
         self.sweeper = Sweeper2(self.jumps,
-                     [], # station_info: Iterable[StationInfo]
+                     [], # si: Iterable[StationInfo]
                      1, # starting_station_id: StationId,
                      1, # starting_system_id: SystemId,
                      100, # max_volume: int,
@@ -54,7 +54,7 @@ class TestSweeper2(TestCase):
 
     def test_get_shortest_paths(self):
         s = Sweeper2(self.jumps,
-                     [], # station_info: Iterable[StationInfo]
+                     [], # si: Iterable[StationInfo]
                      1, # starting_station_id: StationId,
                      1, # starting_system_id: SystemId,
                      100, # max_volume: int,

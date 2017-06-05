@@ -6,7 +6,7 @@ from operator import itemgetter, attrgetter
 import itertools
 from pprint import pprint
 
-from typing import Dict, List, Iterable, NewType, Tuple, T, Set
+from typing import Dict, List, Iterable, NewType, Tuple, T, Set, Union
 from typing import FrozenSet
 
 from datetime import datetime, timedelta
@@ -23,6 +23,7 @@ StationInfo = namedtuple('StationInfo', 'system_id station_id total_value total_
 
 SolutionInfo = namedtuple('SolutionInfo',
                           'shortest_path station_list value_per_jump total_value total_volume')
+
 
 class Sweeper2:
     """
@@ -41,6 +42,7 @@ class Sweeper2:
        each jump and each station counts as a step on the path
        best solution is a complete load with maximum (isk/step)
     """
+
     def __init__(self,
                  allowed_jumps: Dict[SystemId, SystemSet],
                  station_info: Iterable[StationInfo],
@@ -48,30 +50,35 @@ class Sweeper2:
                  starting_system_id: SystemId,
                  max_volume: int,
                  duration_in_seconds: int,
-                 max_segment_length = 12):
+                 max_segment_length=12):
         self.allowed_jumps = allowed_jumps
         self.ending_time = datetime.now() + timedelta(seconds=duration_in_seconds)
-        self.distance_maps = dict() # type: Dict[SystemId, Dict[SystemId]]
-        self.known_system_sets = dict() # type: Dict[SystemSet, int] tracks system combinations we have already processed
-                                        # and the length of the shortest path through them we've seen
+        self.distance_maps = dict()  # type: Dict[SystemId, Dict[SystemId, int]]
+        self.known_system_sets = dict()  # type: Dict[SystemSet, int] tracks system combos we have already processed
+        # and the length of the shortest path through them we've seen
 
         # make sure we don't pick up assets from starting station
         stations_without_starting_station = filter(lambda x: x.station_id != starting_station_id, station_info)
         system_key = attrgetter('system_id')
-        self.station_info_by_system_id = defaultdict(list) # type: Dict[SystemId, List[StationInfo]]
+        self.station_info_by_system_id = defaultdict(list)  # type: Dict[SystemId, List[StationInfo]]
         self.station_info_by_system_id.update({system_id: list(stations)
                                                for system_id, stations in
-                                                   groupby(sorted(stations_without_starting_station, key=system_key),
-                                                           key=system_key)})
+                                               groupby(sorted(stations_without_starting_station, key=system_key),
+                                                       key=system_key)})
         self.starting_system_id = starting_system_id
         self.starting_station_id = starting_station_id
         self.max_volume = max_volume
-        self.max_segment_length = max_segment_length # limit searches between waypoints to this distance.  Systems
-                                                     # further away can be reached if there are intermediate waypoints
+        self.max_segment_length = max_segment_length  # limit searches between waypoints to this distance.  Systems
+        # further away can be reached if there are intermediate waypoints
+        self.best_by_jump_count = dict()  # type: Dict[int, SolutionInfo]
+
+    def get_best_by_jump_count(self):
+        return self.best_by_jump_count
+
     def get_related_station_infos(self, systems: Iterable[SystemId]):
         return chain.from_iterable(self.station_info_by_system_id[x] for x in systems)
 
-    def get_plan_v2(self) -> Tuple[SolutionInfo, SolutionInfo]:
+    def get_plan_v2(self) -> Union[Tuple[SolutionInfo, SolutionInfo], None]:
         """
         Finds a solution by searching for paths with high value stations.
         Start with the system with the highest value station, find the shortest round trip path to that system (for
@@ -82,13 +89,11 @@ class Sweeper2:
          the best path to the 3rd highest station included the 4th highest)
         """
         system_values = [(max([s.total_value for s in station_list], default=0), system)
-                             for system, station_list in self.station_info_by_system_id.items()]
+                         for system, station_list in self.station_info_by_system_id.items()]
         systems_ordered_by_value = [x[1] for x in sorted(system_values, reverse=True)]
 
         previous_systems = []
-        best_total_value = 0
         total_value_solution = None
-        best_value_per_jump = 0
         value_per_jump_solution = None
 
         for new_system in systems_ordered_by_value:
@@ -106,31 +111,24 @@ class Sweeper2:
                     continue
                 for path in paths:
                     stations_on_path = self.get_stations_from_systems(path, self.max_volume)
+                    jump_count = len(path) + len(stations_on_path)
                     total_value = sum(x.total_value for x in stations_on_path)
-                    value_per_jump = total_value / (len(path) + len(stations_on_path))
+                    value_per_jump = total_value / jump_count
                     print("path={}; {} #stations, {} total_value".format(path, len(stations_on_path), total_value))
-                    if total_value > best_total_value:
-                        best_total_value = total_value
+
+                    best = self.best_by_jump_count.get(jump_count, None)
+                    if best is None or total_value > best.total_value:
                         total_volume = sum(x.total_volume for x in stations_on_path)
-                        total_value_solution = SolutionInfo(path,
-                                                            stations_on_path,
-                                                            value_per_jump,
-                                                            total_value,
-                                                            total_volume)
-                    if value_per_jump > best_value_per_jump:
-                        best_value_per_jump = value_per_jump
-                        total_volume = sum(x.total_volume for x in stations_on_path)
-                        value_per_jump_solution = SolutionInfo(path,
-                                                               stations_on_path,
-                                                               value_per_jump,
-                                                               total_value,
-                                                               total_volume)
+                        self.best_by_jump_count[jump_count] = SolutionInfo(path,
+                                                                           stations_on_path,
+                                                                           value_per_jump,
+                                                                           total_value,
+                                                                           total_volume)
             previous_systems.append(new_system)
-        return (total_value_solution, value_per_jump_solution)
+        return
 
     def time_is_up(self):
         return self.ending_time < datetime.now()
-
 
     def get_shortest_paths(self, required_systems: Iterable[SystemId]):
         # find which order produces the shortest path
@@ -173,7 +171,7 @@ class Sweeper2:
                     filtered_paths += [p]
                 else:
                     print("*", end="", flush=True)
-                    pass # duplicate, can skip
+                    pass  # duplicate, can skip
             else:
                 self.known_system_sets[system_set] = len(p)
                 filtered_paths += [p]
@@ -193,11 +191,11 @@ class Sweeper2:
         have the same minimal length that all those paths are returned.
         """
         print('expand {}'.format(waypoints))
-        paths_per_segment = [ [[waypoints[0]]] ] # first segment is always the starting system
+        paths_per_segment = [[[waypoints[0]]]]  # first segment is always the starting system
         for a, b in zip(waypoints[0:-1], waypoints[1:]):
             # for each segment,skip the first entry since first entry of a segment == last entry of previous segment
-            paths_per_segment += [ [p[1:] for p in self.get_paths(a,b)] ]
-            print('{} -> {} expansions {}'.format(a,b, self.get_paths(a,b)))
+            paths_per_segment += [[p[1:] for p in self.get_paths(a, b)]]
+            print('{} -> {} expansions {}'.format(a, b, self.get_paths(a, b)))
         segment_path_combinations = list(itertools.product(*paths_per_segment))
         print("segment_path_combinations {}".format(segment_path_combinations))
         # combine the paths_per_segment into a single list
@@ -205,16 +203,14 @@ class Sweeper2:
         print("flattened {}".format(flattened))
         return flattened
 
-
-
     def get_paths(self, x, y):
-        d = self.get_distance(x,y)
+        d = self.get_distance(x, y)
         if d == 1:
-            return [(x,y)]
+            return [(x, y)]
         else:
             paths = []
-            for n in [n for n in self.allowed_jumps[x] if self.get_distance(n, y)==(d-1)]:
-                paths += self.get_paths(n,y)
+            for n in [n for n in self.allowed_jumps[x] if self.get_distance(n, y) == (d - 1)]:
+                paths += self.get_paths(n, y)
             return [[x] + list(p) for p in paths]
 
     def get_stations_from_systems(self, systems: Iterable[SystemId], volume: float) -> List[StationInfo]:
@@ -235,7 +231,7 @@ class Sweeper2:
         returns a map of distances (number of jumps) from starting system to all other systems
         """
         distances = {starting_system_id: 0}  # distance from start
-        systems = set((starting_system_id,))  # type: Set[SystemId]
+        systems = {starting_system_id}  # type: Set[SystemId]
         new_neighbors = set()
         new_distance = 1
         while len(systems) > 0 and new_distance <= self.max_segment_length:
@@ -243,9 +239,10 @@ class Sweeper2:
                 new_neighbors.update(self.allowed_jumps[sys].difference(distances.keys()))
             for n in new_neighbors:
                 distances[n] = new_distance
-            systems = new_neighbors; new_neighbors = set(); new_distance += 1
+            systems = new_neighbors
+            new_neighbors = set()
+            new_distance += 1
         return distances
-
 
 
 def _get_station_info(api: ESI_Api, sda: StaticDataAccessor.StaticDataAccessor) -> List[StationInfo]:
@@ -260,8 +257,8 @@ def _get_station_info(api: ESI_Api, sda: StaticDataAccessor.StaticDataAccessor) 
             type_id = asset['type_id']
             category = asset['category_id']
             volume = sda.get_type_volume(type_id)
-            if category in {6, 18} or volume >= 3000:
-                # exclude ships, drones, and large objects like station containers
+            if category in {6, 18} or volume >= 3000 or asset['location_type'] != 'station':
+                # exclude ships, drones, and large objects like station containers or items in those
                 continue
             price = api.get_market_price(type_id)
             quantity = max(asset.get('quantity', 1), 1)
@@ -271,7 +268,7 @@ def _get_station_info(api: ESI_Api, sda: StaticDataAccessor.StaticDataAccessor) 
     return result
 
 
-def  get_solution_path(solution: SolutionInfo, api: ESI_Api, sda: StaticDataAccessor.StaticDataAccessor) -> Iterable[str]:
+def get_solution_path(solution: SolutionInfo, sda: StaticDataAccessor.StaticDataAccessor) -> Iterable[str]:
     """ print the path with system and station names. Since this is a loop it does not matter which direction we travel.
       TODO: Choose the path that minimizes the amount of jumps goods are carried to minimize the chance of being ganked.
       To acheive this pick up the item the last time though a system if it is visited multiple times.  Can also try both
@@ -293,8 +290,9 @@ def  get_solution_path(solution: SolutionInfo, api: ESI_Api, sda: StaticDataAcce
     return reversed(path_elements)
 
 
-def partition(iter: Iterable[T], pred) -> Tuple[Iterable[T],Iterable[T]]:
-    return reduce(lambda x, y: (x[0] + [y], x[1]) if pred(y) else (x[0], x[1] + [y]), iter, ([], []))
+def partition(iterable: Iterable[T], pred) -> Tuple[Iterable[T], Iterable[T]]:
+    return reduce(lambda x, y: (x[0] + [y], x[1]) if pred(y) else (x[0], x[1] + [y]), iterable, ([], []))
+
 
 def powerset(iterable: Iterable) -> Iterable[List]:
     """" from itertools#recipes
@@ -303,39 +301,59 @@ def powerset(iterable: Iterable) -> Iterable[List]:
     s = list(iterable)
     return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s) + 1))
 
+
 if __name__ == '__main__':
-    sda = StaticDataAccessor.StaticDataAccessor()
-    jumps = sda.get_system_jumps()
+    def run_test():
+        sda = StaticDataAccessor.StaticDataAccessor()
+        jumps = sda.get_system_jumps()
 
-    # api = ESI_Api('Brand Wessa')
-    api = ESI_Api('Tansy Dabs')
+        # api = ESI_Api('Brand Wessa'); volume = 16000
+        api = ESI_Api('Tansy Dabs'); volume = 9500
 
-    # pprint(stations_by_system)
-    # exit()
-    # Dodoxie IX Moon 20
-    station_id = 60011866
-    system_id = 30002659
-    station_info = _get_station_info(api, sda)
-    s = Sweeper2(jumps,
-                station_info,
-                station_id,
-                system_id,
-                9600, # max volume
-                25)  # duration in seconds
+        # pprint(stations_by_system)
+        # exit()
+        Dodoxie_IX_Moon_20_id = 60011866
+        Dodoxie_id = 30002659
+        si = _get_station_info(api, sda)
+        sweeper = Sweeper2(jumps,
+                           si,
+                           Dodoxie_IX_Moon_20_id,
+                           Dodoxie_id,
+                           volume,  # max volume
+                           60)  # duration in seconds
 
-    total_value_solution, value_per_jump_solution = s.get_plan_v2()
-    print("Total Value Solution")
-    print("{} jumps, {} stations, value={:,.0f},  valuePerJump={:,.1f}"
-          .format(len(total_value_solution.shortest_path),
-                  len(total_value_solution.station_list),
-                  total_value_solution.total_value,
-                  total_value_solution.value_per_jump))
-    print('\n'.join(get_solution_path(total_value_solution, api, sda)))
-    print()
-    print("Value Per Jump Solution")
-    print("{} jumps, {} stations, value={:,.0f},  valuePerJump={:,.1f}"
-          .format(len(value_per_jump_solution.shortest_path),
-                  len(value_per_jump_solution.station_list),
-                  value_per_jump_solution.total_value,
-                  value_per_jump_solution.value_per_jump))
-    print('\n'.join(get_solution_path(value_per_jump_solution, api, sda)))
+        sweeper.get_plan_v2()
+        total_value_solution = None
+        value_per_jump_solution = None
+        for jump_count, solution in sweeper.best_by_jump_count.items():
+            print("{:2d}  {:3d} jumps,  {:2d} stations,  {:16,.0f} total_value {:12,.1f} value_per_jump".format(
+                jump_count,
+                len(solution.shortest_path),
+                len(solution.station_list),
+                solution.total_value,
+                solution.value_per_jump))
+            if total_value_solution is None or solution.total_value > total_value_solution.total_value:
+                total_value_solution = solution
+            if value_per_jump_solution is None or solution.value_per_jump > value_per_jump_solution.value_per_jump:
+                value_per_jump_solution = solution
+
+        print()
+        print("Total Value Solution")
+        print("{} jumps, {} stations, value={:,.0f},  valuePerJump={:,.1f}"
+              .format(len(total_value_solution.shortest_path),
+                      len(total_value_solution.station_list),
+                      total_value_solution.total_value,
+                      total_value_solution.value_per_jump))
+        print('\n'.join(get_solution_path(total_value_solution, sda)))
+        print()
+        print("Value Per Jump Solution")
+        print("{} jumps, {} stations, value={:,.0f},  valuePerJump={:,.1f}"
+              .format(len(value_per_jump_solution.shortest_path),
+                      len(value_per_jump_solution.station_list),
+                      value_per_jump_solution.total_value,
+                      value_per_jump_solution.value_per_jump))
+        print('\n'.join(get_solution_path(value_per_jump_solution, sda)))
+
+
+    run_test()
+

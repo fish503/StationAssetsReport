@@ -347,14 +347,14 @@ if __name__ == '__main__':
         print("Timer Expired!")
     finally:
         t.cancel()
-    # pprint(s.generate_system_priorities())
+    # pprint(sweeper.generate_system_priorities())
     solution = s.get_plan()
     print('\n'.join(get_solution_path(solution, api, sda)))
     print_solution_info(solution)
 
     # used_stations = set([x.station_id for x in solution.station_list])
-    # s = Sweeper(jumps, filter(lambda x: x.station_id not in used_stations, station_info), station_id, system_id, 9600)
-    # solution2 = s.get_plan()
+    # sweeper = Sweeper(jumps, filter(lambda x: x.station_id not in used_stations, si), station_id, system_id, 9600)
+    # solution2 = sweeper.get_plan()
     # print('\n'.join(get_solution_path(solution2, api, sda)))
     # print_solution_info(solution2)
 
