@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta
 from pprint import pprint
+
+from traitlets import Float
+
 from DataTypes import StationData, TypeData, MarketPriceData, TypeId, MarketOrderData
 from typing import Optional, Dict, List
 from TokenManager import TokenData  # needed to allow unpickling of TokenData
@@ -177,9 +180,8 @@ class ESI_Api:
             exit(1)
 
     def wallet_balance(self) -> float:
-        wallet_list = self.call('/characters/{}/wallets/', self.character_id)  # type: List[dict]
-        # not sure why, but the response is coming back in 1/100 isk
-        return next(x['balance']/100.0 for x in wallet_list if x['wallet_id']==1000)  # return the balance of the character wallet
+        wallet_bal = self.call('/characters/{}/wallet/', self.character_id)  # type: Float
+        return wallet_bal
 
     def put_historical_values(self, station_value: float, orders_value: float, escrow_value: float, ship_value: float, wallet_balance: float):
         self.cache_manager.put_historical_values(self.character_id, station_value, orders_value, escrow_value, ship_value, wallet_balance)
@@ -270,6 +272,9 @@ if __name__ == '__main__':
     api = ESI_Api('Brand Wessa')
     #api = ESI_Api('Tansy Dabs')
     # api = ESI_Api('Tabash Masso')
+
+    print(api.wallet_balance())
+    exit()
 
     assets = api.assets()
     pprint(assets, indent=2, width=120, compact=False)
